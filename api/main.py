@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from datetime import datetime, timezone
@@ -121,21 +121,17 @@ def root():
     return {"status": "running", "service": "EFSB Monitoring API"}
 
 @app.post("/api/capture")
-async def capture(
-    request: Request,
-    image: UploadFile = File(None),
-    trap_id: str = Form("TRAP-001"),
-    battery: float = Form(0.0)
-):
+async def capture(request: Request):
     try:
-        # Handle both UploadFile (multipart) and raw binary body posts from ESP32
-        if image is not None:
-            data = await image.read()
-        else:
-            data = await request.body()
-            
+        data = await request.body()
         if not data:
             raise HTTPException(400, "Empty image data received")
+            
+        trap_id = request.headers.get("X-Trap-Id", "TRAP-001")
+        try:
+            battery = float(request.headers.get("X-Battery", "0.0"))
+        except ValueError:
+            battery = 0.0
             
         now = datetime.now(timezone.utc)
         filename = f"{now.strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.jpg"
