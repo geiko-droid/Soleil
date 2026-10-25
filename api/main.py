@@ -122,12 +122,18 @@ def root():
 
 @app.post("/api/capture")
 async def capture(
-    image: UploadFile = File(...),
+    request: Request,
+    image: UploadFile = File(None),
     trap_id: str = Form("TRAP-001"),
     battery: float = Form(0.0)
 ):
     try:
-        data = await image.read()
+        # Handle both UploadFile (multipart) and raw binary body posts from ESP32
+        if image is not None:
+            data = await image.read()
+        else:
+            data = await request.body()
+            
         if not data:
             raise HTTPException(400, "Empty image data received")
             
