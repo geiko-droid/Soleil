@@ -1,8 +1,4 @@
-
- dashboard/.venv/
-
 dashboard/.venv/
-
-dashboard/.venv/
-
 .venv/
+EFSB_Monitoring_System/api/captured_images/*
+!EFSB_Monitoring_System/api/captured_images/.gitkeep
