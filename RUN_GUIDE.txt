@@ -1,0 +1,36 @@
+EFSB MONITORING SYSTEM - RUN GUIDE
+
+1. Open the project folder in VS Code.
+
+2. Activate your existing virtual environment:
+   .venv\Scripts\activate
+
+3. If packages are already installed, skip installation.
+   Otherwise:
+   pip install -r dashboard\requirements.txt
+
+4. Open TERMINAL 1:
+   uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
+
+5. Open TERMINAL 2:
+   streamlit run dashboard\app.py
+
+6. Open:
+   http://localhost:8501
+
+The new Overview page is designed around the supplied SysMon screenshot:
+- dark navigation sidebar
+- header with system title
+- four top monitoring cards
+- Trap Network Status panel
+- Recent Alerts panel
+- three bottom KPI cards
+
+EFSB-specific replacements:
+- CPU Usage -> Total Moths Detected
+- Memory Usage -> Infestation Status
+- Disk Usage -> Last Capture
+- Network -> System Uptime
+- System Status -> Trap Network Status
+- Recent Alerts -> Infestation Alerts
+- Uptime/Sessions -> Active Traps / Active Alerts / Capture Records

@@ -1,0 +1,29 @@
+VISUAL DESIGN BASED ON THE USER'S REFERENCE SCREENSHOT
+
+Palette
+- Sidebar: #111827 (dark navy)
+- Page background: #F6F7F9
+- Cards: #FFFFFF
+- Main text: #172033
+- Muted text: #667085
+- Green success: #1F9D55
+- Cyan/blue info: #078FA8
+- Amber warning: #E5A11A
+- Red critical: #D92D20
+- Borders: #E4E7EC
+
+UI details
+- Rounded 13px cards
+- Thin gray borders and subtle shadows
+- Green/blue/amber/red left borders for status cards
+- Compact status badges
+- Small top-right icons in every metric card
+- Dark sidebar with compact navigation
+- White top header
+- Large bold dashboard numbers
+- Clean monitoring/operations style
+
+The wording and metrics remain EFSB-specific:
+Total Moths Detected, Infestation Status, Last Capture, System Uptime,
+Trap Network Status, Recent Alerts, Active Traps, Battery, Image Feed,
+Infestation Trends, Data Logging, and Settings.

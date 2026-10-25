@@ -1,0 +1,1 @@
+Put your trained YOLO model here as moth_detector.pt and set USE_YOLO=true.
