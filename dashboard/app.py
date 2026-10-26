@@ -177,7 +177,7 @@ if page == "🏠︎ Dashboard":
     with left:
         st.markdown('<div class="panel"><div class="panel-title">✓ Trap Network Status</div><div class="panel-sub">Health of deployed monitoring units</div>', unsafe_allow_html=True)
         st.write(f"**Active Traps**                                    {summary['active_traps']} / {summary['total_traps']} 🟢")
-        st.write(f"**Average Battery**                                 {summary['avg_battery']:.0f}% 🟢")
+        st.write(f"**Average Battery**                                   {summary['avg_battery']:.0f}% 🟢")
         st.write(f"**Solar-Powered Units**                             {summary['total_traps']} ☀️")
         st.write(f"**Data Refresh**                                    Every 30 seconds")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -271,15 +271,20 @@ elif page == "📸 Image Feed":
     
     if rows:
         latest = rows[0]
-        latest_img_path = BASE / "captured_images" / latest["image_path"]
+        # Construct full remote image URL pointing to Render backend
+        img_path_raw = latest.get("image_path", "")
+        if img_path_raw.startswith("http"):
+            latest_img_url = img_path_raw
+        else:
+            latest_img_url = f"{API_URL}/{img_path_raw.lstrip('/')}"
         
         st.markdown("### 🔴 Live Security Snapshot")
         col_live1, col_live2 = st.columns([2, 1])
         with col_live1:
-            if latest_img_path.exists():
-                st.image(str(latest_img_path), caption=f"Latest Capture - {latest['trap_id']} ({str(latest['captured_at']).replace('T',' ')[:19]})", use_container_width=True)
-            else:
-                st.warning("Latest image file not found locally.")
+            try:
+                st.image(latest_img_url, caption=f"Latest Capture - {latest['trap_id']} ({str(latest['captured_at']).replace('T',' ')[:19]})", use_container_width=True)
+            except Exception:
+                st.warning("Could not load latest image from server.")
         with col_live2:
             st.metric("Detected Moths", latest["moth_count"])
             st.write("**Infestation Status:**", badge(latest["infestation_level"]))
@@ -290,13 +295,18 @@ elif page == "📸 Image Feed":
         st.markdown("### 🗂️ Historical Archives")
         for row in rows[1:20]:
             with st.container(border=True):
-                p = BASE / "captured_images" / row["image_path"]
+                path_raw = row.get("image_path", "")
+                if path_raw.startswith("http"):
+                    row_img_url = path_raw
+                else:
+                    row_img_url = f"{API_URL}/{path_raw.lstrip('/')}"
+                
                 a, b = st.columns([2, 1])
                 with a:
-                    if p.exists(): 
-                        st.image(str(p), use_container_width=True)
-                    else: 
-                        st.info("Image not available locally.")
+                    try:
+                        st.image(row_img_url, use_container_width=True)
+                    except Exception:
+                        st.info("Image not available from server.")
                 with b:
                     st.subheader(row["trap_id"])
                     st.metric("Moth Count", row["moth_count"])
