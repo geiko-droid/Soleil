@@ -124,23 +124,42 @@ def metric_card(label, value, detail, kind="green", badge_html=""):
     </div>
     """, unsafe_allow_html=True)
 
-summary = get("/api/summary", {
-    "total_moths":0,"infestation_status":"Low","last_capture":None,
-    "active_traps":0,"total_traps":0,"avg_battery":0,
-    "unacknowledged_alerts":0,"uptime_hours":0
-})
+# Fetch API data
+summary_api = get("/api/summary", None)
 captures = get("/api/captures?limit=1000", [])
 traps = get("/api/traps", [])
 alerts = get("/api/alerts", [])
 settings = get("/api/settings", {"threshold":50,"high_multiplier":1.5,"critical_multiplier":2})
+
+# --- ROBUST FALLBACK CALCULATIONS ---
+total_moths = sum(int(x.get("moth_count", 0)) for x in captures) if captures else 0
+active_traps = len(traps) if traps else 0
+total_traps = len(traps) if traps else 0
+avg_battery = sum(float(t.get("battery", 0)) for t in traps) / total_traps if total_traps > 0 else 0
+unack_alerts = sum(1 for a in alerts if not a.get("acknowledged", False))
+
+last_capture = None
+if captures:
+    last_capture = captures[0].get("captured_at")
+
+summary = {
+    "total_moths": summary_api.get("total_moths", total_moths) if summary_api and summary_api.get("total_moths", 0) > 0 else total_moths,
+    "infestation_status": summary_api.get("infestation_status", "Low") if summary_api else "Low",
+    "last_capture": summary_api.get("last_capture", last_capture) if summary_api else last_capture,
+    "active_traps": summary_api.get("active_traps", active_traps) if summary_api else active_traps,
+    "total_traps": summary_api.get("total_traps", total_traps) if summary_api else total_traps,
+    "avg_battery": summary_api.get("avg_battery", avg_battery) if summary_api else avg_battery,
+    "unacknowledged_alerts": summary_api.get("unacknowledged_alerts", unack_alerts) if summary_api else unack_alerts,
+    "uptime_hours": summary_api.get("uptime_hours", 24.0) if summary_api else 24.0
+}
 
 with st.sidebar:
     st.markdown("💻 EFSB Monitor")
     st.caption("Pheromone Trap Monitoring")
     page = st.radio(
         "Navigation",
-        ["🏠︎ Dashboard","🛠️ System Utilization","📊 Trap Performance","⚠️ Threat Alerts",
-         "📸 Image Feed","📈 Infestation Trends","📝 Data Logging","⚙️ Settings"],
+        ["🏠︎ Dashboard", "🛠️ System Utilization", "📸 Image Feed", 
+         "📈 Infestation Trends", "📝 Data Logging", "⚙️ Settings"],
         label_visibility="visible"
     )
     st.divider()
@@ -176,10 +195,10 @@ if page == "🏠︎ Dashboard":
     left,right = st.columns(2)
     with left:
         st.markdown('<div class="panel"><div class="panel-title">✓ Trap Network Status</div><div class="panel-sub">Health of deployed monitoring units</div>', unsafe_allow_html=True)
-        st.write(f"**Active Traps**                                    {summary['active_traps']} / {summary['total_traps']} 🟢")
-        st.write(f"**Average Battery**                                   {summary['avg_battery']:.0f}% 🟢")
-        st.write(f"**Solar-Powered Units**                             {summary['total_traps']} ☀️")
-        st.write(f"**Data Refresh**                                    Every 30 seconds")
+        st.write(f"**Active Traps**                             {summary['active_traps']} / {summary['total_traps']} 🟢")
+        st.write(f"**Average Battery**                          {summary['avg_battery']:.0f}% 🟢")
+        st.write(f"**Solar-Powered Units**                      {summary['total_traps']} ☀️")
+        st.write(f"**Data Refresh**                             Every 30 seconds")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with right:
@@ -220,49 +239,6 @@ elif page == "🛠️ System Utilization":
         st.info("No traps registered.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-elif page == "📊 Trap Performance":
-    st.markdown('<div class="title">Trap Performance</div><div class="sub">Hardware and capture performance of deployed units</div>', unsafe_allow_html=True)
-    if traps:
-        selected = st.selectbox("Select Trap", [t["trap_id"] for t in traps])
-        rows = [x for x in captures if x["trap_id"] == selected]
-        total = sum(x["moth_count"] for x in rows)
-        avg = (total/len(rows)) if rows else 0
-        a,b,c,d = st.columns(4)
-        with a: metric_card("Moths Detected", total, "Selected trap","green")
-        with b: metric_card("Captures", len(rows), "Images received","cyan")
-        with c: metric_card("Avg. Moths/Capture", f"{avg:.1f}", "Detection average","yellow")
-        with d:
-            t = next(x for x in traps if x["trap_id"]==selected)
-            metric_card("Battery", f'{float(t["battery"]):.0f}%', "Current battery level","cyan")
-        if rows:
-            df = pd.DataFrame(rows); df["captured_at"] = pd.to_datetime(df["captured_at"])
-            daily = df.groupby(df["captured_at"].dt.date)["moth_count"].sum().reset_index()
-            fig = px.line(daily, x="captured_at", y="moth_count", markers=True)
-            fig.update_layout(height=360, xaxis_title="", yaxis_title="Moths")
-            st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Register a trap first.")
-
-elif page == "⚠️ Threat Alerts":
-    st.markdown('<div class="title">Threat Alerts</div><div class="sub">Infestation alerts generated from moth-count thresholds</div>', unsafe_allow_html=True)
-    total=len(alerts); unack=sum(1 for x in alerts if not x["acknowledged"])
-    a,b,c=st.columns(3)
-    with a: metric_card("Total Alerts",total,"All generated alerts","red")
-    with b: metric_card("Unacknowledged",unack,"Require attention","red")
-    with c: metric_card("Acknowledged",total-unack,"Resolved alerts","green")
-    st.write("")
-    for al in alerts:
-        with st.container(border=True):
-            x,y = st.columns([5,1])
-            with x:
-                st.write(f"**{al['trap_id']}** — {al['message']}")
-                st.caption(str(al["created_at"]).replace("T"," ")[:19])
-            with y:
-                st.markdown(badge(al["severity"].title()), unsafe_allow_html=True)
-                if not al["acknowledged"] and st.button("Acknowledge", key=f"a{al['id']}"):
-                    post(f"/api/alerts/{al['id']}/ack")
-                    st.rerun()
-
 elif page == "📸 Image Feed":
     st.markdown('<div class="title">CCTV Trap Feed</div><div class="sub">Scheduled 2-hour interval captures and AI analysis</div>', unsafe_allow_html=True)
     
@@ -271,7 +247,6 @@ elif page == "📸 Image Feed":
     
     if rows:
         latest = rows[0]
-        # Construct full remote image URL pointing to Render backend
         img_path_raw = latest.get("image_path", "")
         if img_path_raw.startswith("http"):
             latest_img_url = img_path_raw
@@ -314,7 +289,7 @@ elif page == "📸 Image Feed":
                     st.write("Confidence:", f'{float(row["confidence"]):.2f}')
                     st.caption(str(row["captured_at"]).replace("T"," ")[:19])
     else: 
-        st.info("No captures available yet. Waiting for the first 2-hour interval upload.")
+        st.info("No captures available yet. Waiting for the first upload.")
 
 elif page == "📈 Infestation Trends":
     st.markdown('<div class="title">Infestation Trends</div><div class="sub">Analyze EFSB population patterns over time</div>', unsafe_allow_html=True)
@@ -348,7 +323,7 @@ elif page == "📝 Data Logging":
 elif page == "⚙️ Settings":
     st.markdown('<div class="title">Settings</div><div class="sub">Configure thresholds and system parameters</div>', unsafe_allow_html=True)
     st.markdown('<div class="panel"><div class="panel-title">Alert Threshold Configuration</div><div class="panel-sub">Thresholds determine when the dashboard raises infestation alerts</div>', unsafe_allow_html=True)
-    threshold=st.number_input("Moth Count Threshold",1,10000,int(settings["threshold"]))
+    threshold=st.number_input("Moth Count Threshold",1,10000,int(settings.get("threshold", 50)))
     a,b,c=st.columns(3)
     with a: metric_card("Moderate",threshold,"moths or more","yellow")
     with b: metric_card("High",int(threshold*1.5),"moths or more","yellow")
