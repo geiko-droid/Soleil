@@ -195,7 +195,7 @@ if page == "🏠︎ Dashboard":
     left,right = st.columns(2)
     with left:
         st.markdown('<div class="panel"><div class="panel-title">✓ Trap Network Status</div><div class="panel-sub">Health of deployed monitoring units</div>', unsafe_allow_html=True)
-        st.write(f"**Active Traps**                             {summary['active_traps']} / {summary['total_traps']} 🟢")
+        st.write(f"**Active Traps**                            {summary['active_traps']} / {summary['total_traps']} 🟢")
         st.write(f"**Average Battery**                          {summary['avg_battery']:.0f}% 🟢")
         st.write(f"**Solar-Powered Units**                      {summary['total_traps']} ☀️")
         st.write(f"**Data Refresh**                             Every 30 seconds")
@@ -293,38 +293,44 @@ elif page == "📸 Image Feed":
 
 elif page == "📈 Infestation Trends":
     st.markdown('<div class="title">Infestation Trends</div><div class="sub">Analyze EFSB population patterns over time</div>', unsafe_allow_html=True)
-    trap=st.selectbox("Trap",["All Traps"]+[t["trap_id"] for t in traps])
-    days=st.selectbox("Time Range",[7,30,90],format_func=lambda x:f"Last {x} Days")
-    rows=[x for x in captures if trap=="All Traps" or x["trap_id"]==trap]
+    trap = st.selectbox("Trap",["All Traps"]+[t["trap_id"] for t in traps])
+    days = st.selectbox("Time Range",[7,30,90],format_func=lambda x:f"Last {x} Days")
+    rows = [x for x in captures if trap=="All Traps" or x["trap_id"]==trap]
     if rows:
-        df=pd.DataFrame(rows); df["captured_at"]=pd.to_datetime(df["captured_at"],utc=True)
-        df=df[df["captured_at"] >= pd.Timestamp.now(tz="UTC")-pd.Timedelta(days=days)]
+        df = pd.DataFrame(rows)
+        df["captured_at"] = pd.to_datetime(df["captured_at"],utc=True)
+        df = df[df["captured_at"] >= pd.Timestamp.now(tz="UTC")-pd.Timedelta(days=days)]
         if not df.empty:
-            daily=df.groupby(df["captured_at"].dt.date)["moth_count"].sum().reset_index()
-            fig=px.line(daily,x="captured_at",y="moth_count",markers=True)
+            daily = df.groupby(df["captured_at"].dt.date)["moth_count"].sum().reset_index()
+            fig = px.line(daily,x="captured_at",y="moth_count",markers=True)
             fig.update_layout(height=430,xaxis_title="",yaxis_title="Moths Detected")
             st.plotly_chart(fig,use_container_width=True)
-        else: st.info("No data for this period.")
-    else: st.info("No capture data available.")
+        else: 
+            st.info("No data for this period.")
+    else: 
+        st.info("No capture data available.")
 
 elif page == "📝 Data Logging":
     st.markdown('<div class="title">Data Logging</div><div class="sub">Complete record of capture events and detection metrics</div>', unsafe_allow_html=True)
-    q=st.text_input("Search trap, date, or record")
-    trap=st.selectbox("Trap",["All Traps"]+[t["trap_id"] for t in traps])
-    rows=captures
-    if q: rows=[r for r in rows if q.lower() in str(r).lower()]
-    if trap!="All Traps": rows=[r for r in rows if r["trap_id"]==trap]
-    df=pd.DataFrame(rows)
+    q = st.text_input("Search trap, date, or record")
+    trap = st.selectbox("Trap",["All Traps"]+[t["trap_id"] for t in traps])
+    rows = captures
+    if q: 
+        rows = [r for r in rows if q.lower() in str(r).lower()]
+    if trap!="All Traps": 
+        rows = [r for r in rows if r["trap_id"]==trap]
+    df = pd.DataFrame(rows)
     if not df.empty:
         st.dataframe(df,use_container_width=True,hide_index=True)
         st.download_button("Export CSV",df.to_csv(index=False),"efsb_capture_records.csv","text/csv")
-    else: st.info("No records found.")
+    else: 
+        st.info("No records found.")
 
 elif page == "⚙️ Settings":
     st.markdown('<div class="title">Settings</div><div class="sub">Configure thresholds and system parameters</div>', unsafe_allow_html=True)
     st.markdown('<div class="panel"><div class="panel-title">Alert Threshold Configuration</div><div class="panel-sub">Thresholds determine when the dashboard raises infestation alerts</div>', unsafe_allow_html=True)
-    threshold=st.number_input("Moth Count Threshold",1,10000,int(settings.get("threshold", 50)))
-    a,b,c=st.columns(3)
+    threshold = st.number_input("Moth Count Threshold",1,10000,int(settings.get("threshold", 50)))
+    a,b,c = st.columns(3)
     with a: metric_card("Moderate",threshold,"moths or more","yellow")
     with b: metric_card("High",int(threshold*1.5),"moths or more","yellow")
     with c: metric_card("Critical",int(threshold*2),"moths or more","red")

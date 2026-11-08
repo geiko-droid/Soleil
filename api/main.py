@@ -277,14 +277,12 @@ def get_summary():
     try:
         total_moths = connection.execute("SELECT COALESCE(SUM(moth_count), 0) FROM captures").fetchone()[0]
         
-        # Get distinct traps that have reported
         trap_rows = connection.execute("SELECT DISTINCT trap_id FROM captures").fetchall()
         active_traps = len(trap_rows)
         
         last_capture_row = connection.execute("SELECT captured_at FROM captures ORDER BY id DESC LIMIT 1").fetchone()
         last_capture = last_capture_row[0] if last_capture_row else None
 
-        # Determine overall infestation based on latest record or total
         infestation_status = "Low"
         if active_traps > 0:
             latest_count = connection.execute("SELECT moth_count FROM captures ORDER BY id DESC LIMIT 1").fetchone()[0]
@@ -296,7 +294,7 @@ def get_summary():
             "last_capture": last_capture,
             "active_traps": active_traps,
             "total_traps": max(active_traps, 1),
-            "avg_battery": 95.0,  # Default battery health estimate if hardware header isn't passed
+            "avg_battery": 95.0,
             "unacknowledged_alerts": connection.execute("SELECT COUNT(*) FROM alerts WHERE acknowledged = 0").fetchone()[0],
             "uptime_hours": 24.0
         }
@@ -308,12 +306,10 @@ def get_summary():
 def get_traps():
     connection = conn()
     try:
-        # Pull distinct active traps dynamically from capture history
         cursor = connection.execute("SELECT DISTINCT trap_id FROM captures")
         trap_ids = [row[0] for row in cursor.fetchall()]
         
         if not trap_ids:
-            # Provide default trap if none registered yet
             trap_ids = ["TRAP_01"]
 
         traps_list = []
@@ -385,12 +381,6 @@ async def capture(request: Request):
 
         infestation = level(count)
 
-        print(
-            f"Capture received | Trap={trap_id} | "
-            f"Moths={count} | Mode={processing_mode} | "
-            f"Infestation={infestation}"
-        )
-
         connection = conn()
         db_image_path = f"/captured_images/{filename}"
 
@@ -429,10 +419,7 @@ async def capture(request: Request):
             """, (
                 trap_id,
                 captured_at.isoformat(),
-                (
-                    f"{count} moths detected in one capture "
-                    f"({infestation} infestation level)."
-                ),
+                f"{count} moths detected in one capture ({infestation} infestation level).",
                 infestation.lower()
             ))
 
@@ -461,7 +448,6 @@ async def capture(request: Request):
             except sqlite3.Error:
                 pass
 
-        print("CAPTURE ERROR:")
         traceback.print_exc()
 
         raise HTTPException(
@@ -561,6 +547,45 @@ def get_alerts():
 
     finally:
         connection.close()
+
+
+# =========================================================
+# GET SETTINGS
+# =========================================================
+
+@app.get("/api/settings")
+def api_get_settings():
+    return get_settings()
+
+
+# =========================================================
+# UPDATE SETTINGS
+# =========================================================
+
+@app.post("/api/settings")
+async def api_update_settings(request: Request):
+    connection = None
+    try:
+        form_data = await request.form()
+        threshold = int(form_data.get("threshold", 50))
+        high_mult = float(form_data.get("high_multiplier", 1.5))
+        crit_mult = float(form_data.get("critical_multiplier", 2.0))
+
+        connection = conn()
+        connection.execute("""
+            UPDATE settings
+            SET threshold = ?, high_multiplier = ?, critical_multiplier = ?
+            WHERE id = 1
+        """, (threshold, high_mult, crit_mult))
+        connection.commit()
+        return {"ok": True, "threshold": threshold}
+    except Exception as e:
+        if connection:
+            connection.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    finally:
+        if connection:
+            connection.close()
 
 
 # =========================================================
